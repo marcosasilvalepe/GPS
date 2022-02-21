@@ -242,7 +242,7 @@ def postData(body):
         print("Body of request:\r\n", body, '\r\n')
         s.connect((url, port))
         s.setblocking(False)
-        s.send(bytes('POST /includes/pythonGps.php HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}'.format(url, len(body), body), 'utf8'))
+        s.send(bytes('POST /includes/upload.php HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}'.format(url, len(body), body), 'utf8'))
         ready = select.select([s], [], [], 10)
         if ready[0]:
             response=s.recv(256)
