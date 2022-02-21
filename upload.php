@@ -33,7 +33,8 @@
 	$json_object = json_decode($q);
 	$post_array = get_object_vars($json_object);
 
-	if ($post_array['?QSN2v3R+#']) {//FILTER VARIABLE TO AVOID ANY1 POSTING DATA TO THE SCRIPT
+	//FILTER VARIABLE TO AVOID ANY1 POSTING DATA TO THE SCRIPT
+	if ($post_array['?QSN2v3R+#']) {
 
 		$epoch = 946684800; //FOR MICROPYTHON TIMESTAMP
 		$version = sanitize($post_array['v']);
@@ -65,8 +66,8 @@
 			if ($trip == 0) {
 
 				mysqli_query($conn, "
-					INSERT INTO gps_car_init (imei, date) VALUES ('$imei', '$now')";
-				);
+					INSERT INTO gps_car_init (imei, date) VALUES ('$imei', '$now');
+				");
 
 				$last_trip_query = select_query("
 					SELECT trip, engine_status 
@@ -123,24 +124,24 @@
 		//POST ERRORS IN MODULE
 		if (in_array("SCbi4yaHBO", $json_object)) {
 
-		$imei = $json_object[0];
-		$datetime = time();
-		$now = date("Y-m-d H:i:s", $datetime);
+			$imei = $json_object[0];
+			$datetime = time();
+			$now = date("Y-m-d H:i:s", $datetime);
 
-		for ($i=1; $i < count($json_object) - 1; $i++) {
-			if ($json_object[$i]!="") {
-				$error = $json_object[$i];
-				mysqli_query($conn, "INSERT INTO errors (imei, date, error) VALUES ('$imei', '$now', '$error')");
+			for ($i=1; $i < count($json_object) - 1; $i++) {
+
+				if ($json_object[$i]!="") {
+					$error = $json_object[$i];
+					mysqli_query($conn, "INSERT INTO errors (imei, date, error) VALUES ('$imei', '$now', '$error')");
+				}
+
+			}
+			
+			if (http_response_code(200)) {
+				mysqli_query($conn, "UPDATE devices SET post_error=0 WHERE imei='$imei'");
+				echo "OK";
 			}
 		}
-		if (http_response_code(200)) {
-			mysqli_query($conn, "UPDATE devices SET post_error=0 WHERE imei='$imei'");
-			echo "OK";
-		}
 	}
-<<<<<<< HEAD
-}
+
 ?>
-=======
-?>
->>>>>>> da4c105929abb437f5566dba9817f9fef0939caf
