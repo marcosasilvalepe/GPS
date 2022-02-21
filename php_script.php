@@ -1,35 +1,35 @@
 <?php  
 
-    /* Prevent XSS input */
-    $_GET   = filter_input_array(INPUT_GET, FILTER_SANITIZE_STRING);
-    $_POST  = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+	/* Prevent XSS input */
+	$_GET   = filter_input_array(INPUT_GET, FILTER_SANITIZE_STRING);
+	$_POST  = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
 
-    $_REQUEST = (array)$_POST + (array)$_GET + (array)$_REQUEST;
-    $dbServername = "localhost";
-    $dbUsername = "dbuser";
-    $dbPassword = "dbpassword";
-    $dbName = "gps";
-    $conn = mysqli_connect($dbServername, $dbUsername, $dbPassword, $dbName);
-    $acentos = $conn -> query("SET NAMES 'utf8'");
+	$_REQUEST = (array)$_POST + (array)$_GET + (array)$_REQUEST;
+	$dbServername = "localhost";
+	$dbUsername = "dbuser";
+	$dbPassword = "dbpassword";
+	$dbName = "gps";
+	$conn = mysqli_connect($dbServername, $dbUsername, $dbPassword, $dbName);
+	$acentos = $conn -> query("SET NAMES 'utf8'");
 
-    function sanitize($input) {
-        global $conn;
-        $input = trim($input);
-        $input = stripslashes($input);
-        $input = mysqli_real_escape_string($conn, $input);
-        $input = htmlspecialchars($input);
-        return $input;
-    }
+	function sanitize($input) {
+		global $conn;
+		$input = trim($input);
+		$input = stripslashes($input);
+		$input = mysqli_real_escape_string($conn, $input);
+		$input = htmlspecialchars($input);
+		return $input;
+	}
 
-    function select_query($query) {
-        global $conn;
-        $result = $conn -> query($query);
-        if ($result !== FALSE)
-            $result = $result -> fetch_all(MYSQLI_ASSOC);
+	function select_query($query) {
+		global $conn;
+		$result = $conn -> query($query);
+		if ($result !== FALSE)
+		    $result = $result -> fetch_all(MYSQLI_ASSOC);
 
-        $conn -> close();
-        return $result;
-    }
+		$conn -> close();
+		return $result;
+	}
 
 	$q = file_get_contents('php://input');
 	$json_object = json_decode($q);
