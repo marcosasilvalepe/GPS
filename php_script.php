@@ -9,10 +9,11 @@
     $dbUsername = "dbuser";
     $dbPassword = "dbpassword";
     $dbName = "gps";
-    global $conn = mysqli_connect($dbServername, $dbUsername, $dbPassword, $dbName);
+    $conn = mysqli_connect($dbServername, $dbUsername, $dbPassword, $dbName);
     $acentos = $conn -> query("SET NAMES 'utf8'");
 
     function sanitize($input) {
+        global $conn;
         $input = trim($input);
         $input = stripslashes($input);
         $input = mysqli_real_escape_string($conn, $input);
@@ -21,6 +22,7 @@
     }
 
     function select_query($query) {
+        global $conn;
         $result = $conn -> query($query);
         if ($result !== FALSE)
             $result = $result -> fetch_all(MYSQLI_ASSOC);
