@@ -1,147 +1,115 @@
-<?php  
+<?php 
 
-	/* Prevent XSS input */
-	$_GET   = filter_input_array(INPUT_GET, FILTER_SANITIZE_STRING);
-	$_POST  = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+	include 'dbh.inc.php';
 
-	$_REQUEST = (array)$_POST + (array)$_GET + (array)$_REQUEST;
-	$dbServername = "localhost";
-	$dbUsername = "dbuser";
-	$dbPassword = "dbpassword";
-	$dbName = "gps";
-	$conn = mysqli_connect($dbServername, $dbUsername, $dbPassword, $dbName);
-	$acentos = $conn -> query("SET NAMES 'utf8'");
+	try {
 
-	function sanitize($input) {
-		global $conn;
-		$input = trim($input);
-		$input = stripslashes($input);
-		$input = mysqli_real_escape_string($conn, $input);
-		$input = htmlspecialchars($input);
-		return $input;
-	}
+		$response = array();
+		$response['success'] = False;
 
-	function select_query($query) {
-		global $conn;
-		$result = $conn -> query($query);
-		if ($result !== FALSE) $result = $result -> fetch_all(MYSQLI_ASSOC);
-		$conn -> close();
-		return $result;
-	}
+		$input = json_decode(file_get_contents('php://input'));
+		$data = (array) $input;
 
-	$q = file_get_contents('php://input');
-	$json_object = json_decode($q);
-	$post_array = get_object_vars($json_object);
+		$identifier = $data['identifier'];
+		$identifier = sanitize($identifier);
 
-	//FILTER VARIABLE TO AVOID ANY1 POSTING DATA TO THE SCRIPT
-	if ($post_array['?QSN2v3R+#']) {
+		if ($identifier !== "unique_identifier") return;
 
 		$epoch = 946684800; //FOR MICROPYTHON TIMESTAMP
-		$version = sanitize($post_array['v']);
-		$imei = sanitize($post_array['imei']);
 
-		if ($post_array['array']) { $data_type="array"; } 
-		else { $data_type="single"; }
+		$imei = $data["imei"];
+		$imei = sanitize($imei);
 
-		$data_array = $post_array['data'];
+		foreach ($data["coordinates"] as $coordinates) {
 
-		foreach ($data_array as $key => $value) {
+			$coordinates = (array) $coordinates;
 
-			$data = get_object_vars($value);
+			$counter = $coordinates["counter"];
+			$counter = sanitize($counter);
 
-			$gps_counter = sanitize($data['counter']);
+			$trip = $coordinates["trip"];
+			$trip = sanitize($trip);
+
+			if ($trip == 1) {
+				$last_trip = select_query("SELECT trip FROM coordinates WHERE imei=$imei ORDER BY id DESC LIMIT 1;");
+				if (count($last_trip) === 0) $trip = 1;
+				else $trip = $last_trip[0]['trip'] + 1;
+			}
+
+			$latitude = $coordinates["latitude"];
+			$latitude = sanitize($latitude);
+
+			$longitude = $coordinates["longitude"];
+			$longitude = sanitize($longitude);
+
+			$engine_status = $coordinates["engine_status"];
+			$engine_status = sanitize($engine_status);
+			$engine_status = ($engine_status) ? 1 : 0; 
+
+			$last_location = $coordinates["last_location"];
+			if ($last_location) {
+
+				$last_record = select_query("SELECT timestamp, speed, gprs, satellites FROM coordinates WHERE imei=$imei ORDER BY id DESC LIMIT 1;");
+				if (count($last_record) === 0) return;
+
+				$timestamp = $last_record[0]['timestamp'];
+				$speed = $last_record[0]['speed'];
+				$gprs = $last_record[0]['gprs'];
+				$satellites = $last_record[0]['satellites'];
+
+			} else {
+				$timestamp = $coordinates["timestamp"];
+				$timestamp = sanitize($timestamp);
+				$timestamp = $timestamp + $epoch;
+
+				$speed = $coordinates["speed"];
+				$speed = sanitize($speed);
+
+				$gprs = $coordinates["gprs"];
+				$gprs = sanitize($gprs);
+
+				$satellites = $coordinates["satellites"];
+				$satellites = sanitize($satellites);	
+			}
+
 			$datetime = time();
 			$now = date("Y-m-d H:i:s", $datetime);
 
-			$timestamp = $data['ts'];
-			if ($timestamp == "0") $timestamp = strtotime($now);
-			else {
-				$timestamp = sanitize($timestamp);
-				$timestamp = intval($timestamp);
-				$timestamp = $timestamp + $epoch;
-			}
-
-			$trip = sanitize($data['trip']);
-
-			if ($trip == 0) {
-
-				mysqli_query($conn, "
-					INSERT INTO gps_car_init (imei, date) VALUES ('$imei', '$now');
-				");
-
-				$last_trip_query = select_query("
-					SELECT trip, engine_status 
-					FROM gps WHERE id=(
-						SELECT MAX(`id`) AS max_id 
-						FROM gps 
-						WHERE imei='$imei'
-					);
-				");
-
-				$last_trip = $last_trip_query[0]['trip'];
-				$last_engine_status = $last_trip_query[0]['engine_status'];
-
-				if (count($last_trip_query) == 0) { $trip = 1; } 
-				else {
-					//NO ENGINE CONTROL
-					if ($version == 0.1) {
-						$trip = $last_trip + 1;
-					} 
-					//WITH ENGINE CONTROL
-					elseif ($version == 0.2) {
-						if ($last_engine_status=='off') { $trip = $last_trip + 1; }
-						else { $trip = $last_trip; }
-					}
-				}
-			}
-
-			$lat = sanitize($data['lat']);
-			$lng = sanitize($data['lng']);
-			$speed = sanitize($data['speed']);
-			$satellites = sanitize($data['sats']);
-			$grps = sanitize($data['2g']);
-			$car_status = sanitize($data['cstat']);
-
 			mysqli_query($conn, "
-				INSERT INTO gps (version, imei, trip, counter, timestamp, date, data_type, lat, lng, speed, gprs, satellites, engine_status) 
-				VALUES ($version, '$imei', $trip, $gps_counter ,'$timestamp', '$now', '$data_type', '$lat', '$lng', $speed, $grps, $satellites, '$car_status');
+				INSERT INTO 
+				coordinates (imei, date, timestamp, trip, counter, latitude, longitude, speed, satellites, gprs, engine_status) 
+				VALUES (
+					'$imei', 
+					'$now',
+					$timestamp,
+					$trip,
+					$counter,
+					'$latitude', 
+					'$longitude', 
+					$speed, 
+					$satellites,
+					$gprs,
+					$engine_status
+				);
 			");
 		}
 
-		if (http_response_code(200)) {
+		//GET USER PREFERENCES
+		$preferences = select_query("SELECT domain, max_saved_coordinates, store_coordinates, script_version, mcu_sleep, reboot FROM users WHERE imei='$imei';")[0];
+		$response['trip'] = intval($trip);
+		$response["domain"] = $preferences["domain"];
+		$response['max_saved_coordinates'] = $preferences['max_saved_coordinates'];
+		$response["store_coordinates"] = $preferences['store_coordinates'];
+		$response["script_version"] = $preferences['script_version'];
+		$response["mcu_sleep"] = intval($preferences['mcu_sleep']);
+		$response["reboot"] = $preferences['reboot'];
 
-			$sql = mysqli_query($conn, "SELECT osSleep, version, post_error FROM devices WHERE imei='$imei'");
-			$result = $sql->fetch_assoc();
-			if ($speed > 90) { $sleep = 15; } 
-			else { $sleep = $result['osSleep']; }
+		if ($response["reboot"] === 1) mysqli_query($conn, "UPDATE users SET reboot=0 WHERE imei=$imei;");
 
-			echo $result['version'] . ":" . $sleep . ":" . $trip . ":" . $result['post_error'];
+		http_response_code(200);
+		$response['success'] = True;
 
-		} else { echo("ERROR"); }
-
-	} else {
-		
-		//POST ERRORS IN MODULE
-		if (in_array("SCbi4yaHBO", $json_object)) {
-
-			$imei = $json_object[0];
-			$datetime = time();
-			$now = date("Y-m-d H:i:s", $datetime);
-
-			for ($i=1; $i < count($json_object) - 1; $i++) {
-
-				if ($json_object[$i]!="") {
-					$error = $json_object[$i];
-					mysqli_query($conn, "INSERT INTO errors (imei, date, error) VALUES ('$imei', '$now', '$error')");
-				}
-
-			}
-			
-			if (http_response_code(200)) {
-				mysqli_query($conn, "UPDATE devices SET post_error=0 WHERE imei='$imei'");
-				echo "OK";
-			}
-		}
 	}
-
+	catch(Exception $e) { $response['error'] = strval($e); }
+	finally { echo json_encode($response); }
 ?>
